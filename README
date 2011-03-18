@@ -1,4 +1,4 @@
-TVC - Toy Version Control
+TVC - Terrible Version Control
 
 TVC is a really terrible remake of git in Ruby.  It should never really be used; its creation was a joke and a learning experience.  It will always be inferior to git.  I read a blog post called The Git Parable (http://tom.preston-werner.com/2009/05/19/the-git-parable.html), and wrote it based on some of the explanations given there.  It's not a terribly well written piece of code, just a script I hacked together in the span of about a day.
 
