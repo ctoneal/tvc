@@ -2,46 +2,7 @@ require 'digest/sha2'
 require 'fileutils'
 require 'json'
 require 'tmpdir'
-
-# main function
-
-# get directories for use later
-@runDir= Dir.getwd
-@repoDir = getRepositoryDirectory
-
-# if we're not initializing and we have no repository
-# issue an error and exit
-if ARGV[0] != "init" && @repoDir.nil?
-	repositoryIssueError
-	Process.exit
-end
-# switch based on command
-case ARGV[0]
-when "init"
-	if @repoDir.nil?
-		init
-	else
-		puts "Repository already initialized"
-	end
-when "commit"
-	commit ARGV[1]
-when "replace"
-	replace ARGV[1]
-when "history"
-	history
-when "branch"
-	if not ARGV[1].nil?
-		branch ARGV[1]
-	else
-		listBranches
-	end
-when "checkout"
-	checkout ARGV[1]
-else
-	help
-end
-
-# end main
+require 'diff/lcs'
 
 # print an error that states that the program must be run in the directory
 # with the repository, and that the repository needs to be initialized.
@@ -56,17 +17,11 @@ end
 # initialize a repository
 def init
 	Dir.mkdir(".tvc") unless Dir::exists?(".tvc")
-	Dir.chdir(".tvc")
-	Dir.mkdir("objects") unless Dir::exists?("objects")
-	f = File.new("pointers", "w")
-	f.puts JSON.generate [{"name" => "master", "hash" => nil, "parent" => nil}]
-	f.close
-	f = File.new("history", "w")
-	f.puts JSON.generate []
-	f.close
-	f = File.new("current", "w")
-	f.puts JSON.generate [{"name" => "master", "hash" => nil, "parent" => nil}]
-	f.close
+	@repoDir = getRepositoryDirectory
+	Dir.mkdir(getObjectsDirectory) unless Dir::exists?(getObjectsDirectory)
+	saveDataToJson(File.join(@repoDir, "pointers"), [{"name" => "master", "hash" => nil, "parent" => nil}])
+	saveDataToJson(File.join(@repoDir, "history"), [])
+	saveDataToJson(File.join(@repoDir, "current"), [{"name" => "master", "hash" => nil, "parent" => nil}])
 end
 
 # commit current changes
@@ -91,8 +46,7 @@ def replace(versionHash)
 	hash = getFullHash(versionHash)
 	if not hash.nil? && File::exists?(hash)
 		deleteFiles(@runDir)
-		root = File.open(hash, "rb") { |f| f.read }
-		rootInfo = JSON.parse root
+		rootInfo = getDataFromJson(File.join(getObjectsDirectory, hash))
 		moveFiles(@runDir, rootInfo)
 	else
 		puts "This version does not exist"
@@ -105,8 +59,7 @@ def history
 	Dir.chdir(@repoDir)
 	current = getCurrentEntry
 	hash = current["hash"]
-	history = File.open("history", "rb") { |f| f.read }
-	versions = JSON.parse history
+	versions = getHistoryEntries
 	while not hash.nil?
 		versions.each do |version|
 			if version["hash"] == hash
@@ -144,6 +97,43 @@ def checkout(branchName)
 	end
 end
 
+# merges a branch into the current branch
+# i'm betting this is going to look like crap
+def merge(branchName)
+	source = findBranch(branchName)
+	target = getCurrentEntry
+	if not source.nil?
+	else
+		puts "Branch doesn't exist"
+	end
+end
+
+# prints a list of valid functions and their uses
+def help
+	puts "help - This text"
+	puts "init - Initialize a repository"
+	puts "commit - Commit changes to a repository"
+	puts "branch - Create a new branch.  If not given a branch name, it lists all current branches."
+	puts "checkout - Move to the specified branch for modifying"
+	puts "replace - Pulls the desired revision down from the repository"
+	puts "merge - Merges the specified branch with the current branch"
+end
+
+# extracts json data from a given file
+def getDataFromJson(filePath)
+	fileText = File.open(filePath, "rb") { |f| f.read }
+	fileJson = JSON.parse fileText
+end
+
+# puts data in json format in a given file
+# warning:  this will replace all text in the file
+def saveDataToJson(filePath, data)
+	file = File.open(filePath, "w")
+	file.truncate(0)
+	file.puts JSON.generate data
+	file.close
+end
+
 # changes the hash for a specified branch, and sets the parent to the previous hash
 def changeBranchHash(name, hash)
 	b = findBranch(name)
@@ -167,36 +157,28 @@ end
 def addHistoryEntry(entry)
 	versions = getHistoryEntries
 	versions << entry
-	historyFile = File.open("history", "w")
-	historyFile.puts JSON.generate versions
-	historyFile.close
+	saveDataToJson(File.join(@repoDir, "history"), versions)
 end
 
 # retrieves the history entries
 def getHistoryEntries
-	history = File.open("history", "rb") { |f| f.read }
-	versions = JSON.parse history
+	history = getDataFromJson(File.join(@repoDir, "history"))
 end
 
 # change the entry in the current file
 def changeCurrentEntry(entry)
 	newEntry = [entry]
-	current = File.open("current", "w")
-	current.truncate(0)
-	current.puts JSON.generate newEntry
-	current.close
+	saveDataToJson(File.join(@repoDir, "current"), newEntry)
 end
 
 # get the entry in the current file
 def getCurrentEntry
-	current = File.open("current", "rb") { |f| f.read }
-	entry = (JSON.parse current)[0]
+	current = (getDataFromJson(File.join(@repoDir, "current")))[0]
 end
 
 # get all branches
 def getBranches
-	pointers = File.open("pointers", "rb") { |f| f.read }
-	branches = JSON.parse pointers
+	branches = getDataFromJson(File.join(@repoDir, "pointers"))
 end
 
 # find a branch.  nil if it does not exist
@@ -248,24 +230,13 @@ def moveFiles(directoryName, jsonInfo)
 		if item["type"] == "tree"
 			d = directoryName + '/' + item["name"]
 			Dir.mkdir(d)
-			dirFile = File.open(item["hash"], "rb") { |f| f.read }
-			dirJson = JSON.parse dirFile
+			dirJson = getDataFromJson(File.join(getObjectsDirectory, item["hash"]))
 			moveFiles(d, dirJson)
 		# copy the item out of the objects folder into its proper place
 		elsif item["type"] == "blob"
 			FileUtils.cp(File.join(getObjectsDirectory, item["hash"]), File.join(directoryName, item["name"]))
 		end
 	end
-end
-
-# prints a list of valid functions and their uses
-def help
-	puts "help - This text"
-	puts "init - Initialize a repository"
-	puts "commit - Commit changes to a repository"
-	puts "branch - Create a new branch.  If not given a branch name, it lists all current branches."
-	puts "checkout - Move to the specified branch for modifying"
-	puts "replace - Pulls the desired revision down from the repository"
 end
 
 # save objects in the objects folder, based on hash
@@ -290,10 +261,8 @@ def createObjects(directoryName)
 		end
 	end
 	# save off objects json file to a temp file
-	tempFileName = File.join(getObjectsDirectory, "crap")
-	tempFile = File.new(tempFileName, "w")
-	tempFile.puts JSON.generate objects
-	tempFile.close
+	tempFileName = File.join(@repoDir, "temp")
+	saveDataToJson(tempFileName, objects)
 	# get the hash for the temp file, save it as that, and return the hash
 	hash = createHash(tempFileName)
 	FileUtils.cp(tempFileName, File.join(getObjectsDirectory, hash))
@@ -322,10 +291,7 @@ end
 
 # save off all branches
 def saveBranches(branches)
-	pointers = File.open("pointers", "w")
-	pointers.truncate(0)
-	pointers.puts JSON.generate branches
-	pointers.close
+	saveDataToJson(File.join(@repoDir, "pointers"), branches)
 end
 
 # get the repository directory
@@ -345,3 +311,44 @@ def listBranches
 	end
 end
 
+# main function
+
+# get directories for use later
+@runDir= Dir.getwd
+@repoDir = getRepositoryDirectory
+
+# if we're not initializing and we have no repository
+# issue an error and exit
+if ARGV[0] != "init" && @repoDir.nil?
+	repositoryIssueError
+	Process.exit
+end
+# switch based on command
+case ARGV[0]
+when "init"
+	if @repoDir.nil?
+		init
+	else
+		puts "Repository already initialized"
+	end
+when "commit"
+	commit ARGV[1]
+when "replace"
+	replace ARGV[1]
+when "history"
+	history
+when "branch"
+	if not ARGV[1].nil?
+		branch ARGV[1]
+	else
+		listBranches
+	end
+when "checkout"
+	checkout ARGV[1]
+when "merge"
+	merge ARGV[1]
+else
+	help
+end
+
+# end main
