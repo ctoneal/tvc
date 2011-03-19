@@ -1,3 +1,4 @@
+require 'rubygems'
 require 'digest/sha2'
 require 'fileutils'
 require 'json'
@@ -44,7 +45,7 @@ end
 def replace(versionHash)
 	Dir.chdir(getObjectsDirectory)
 	hash = getFullHash(versionHash)
-	if not hash.nil? && File::exists?(hash)
+	if not hash.nil?
 		deleteFiles(@runDir)
 		rootInfo = getDataFromJson(File.join(getObjectsDirectory, hash))
 		moveFiles(@runDir, rootInfo)
@@ -56,7 +57,6 @@ end
 
 # prints a list of commits up the chain
 def history
-	Dir.chdir(@repoDir)
 	current = getCurrentEntry
 	hash = current["hash"]
 	versions = getHistoryEntries
@@ -102,9 +102,132 @@ end
 def merge(branchName)
 	source = findBranch(branchName)
 	target = getCurrentEntry
+	parent = findCommonAncestor(source, target)
 	if not source.nil?
+		if not parent.nil?
+			mergeFilesForDirectory(@runDir, source["hash"], target["hash"], parent["hash"])
+			commit("Merged branch #{branchName}")
+		else
+			puts "Could not find common ancestor"
+		end
 	else
 		puts "Branch doesn't exist"
+	end
+end
+
+# attempts to find a common parent for the two revisions
+def findCommonAncestor(source, target)
+	sourceParentHash = source["hash"]
+	versions = getHistoryEntries
+	# loop through until we hit the end of the tree for the source
+	while not sourceParentHash.nil?
+		sourceParent = nil
+		targetParentHash = target["hash"]
+		versions.each do |version|
+			if version["hash"] == sourceParentHash
+				sourceParent = version
+				break
+			end
+		end
+		# loop through the target tree, hoping we find something that matches up
+		while not targetParentHash.nil?
+			versions.each do |version|
+				if version["hash"] == targetParentHash
+					if targetParentHash == sourceParentHash
+						return version
+					else
+						targetParentHash = version["parent"]
+					end
+				end
+			end
+		end
+		if sourceParent.nil?
+			sourceParentHash = nil
+		else
+			sourceParentHash = sourceParent["parent"]
+		end
+	end
+	return nil
+end
+
+# attempts to merge the items for the specified directory together
+def mergeFilesForDirectory(directory, sourceHash, targetHash, parentHash)
+	sourceJson = getDataFromJson(File.join(getObjectsDirectory, sourceHash))
+	targetJson = getDataFromJson(File.join(getObjectsDirectory, targetHash))
+	parentJson = getDataFromJson(File.join(getObjectsDirectory, parentHash))
+	# for each item in the source, attempt to find a corresponding item in the target
+	sourceJson.each do |sourceItem|
+		matchingItem = nil
+		parentMatch = nil
+		targetJson.each do |targetItem|
+			if targetItem["name"] == sourceItem["name"] && targetItem["type"] == sourceItem["type"]
+				matchingItem = targetItem
+				break
+			end
+		end
+		parentJson.each do |parentItem|
+			if parentItem["name"] == sourceItem["name"] && parentItem["type"] == sourceItem["type"]
+				parentMatch = parentItem
+				break
+			end
+		end
+		# we're only going to attempt to merge if we've found some common parent
+		# otherwise, we're just going to straight up replace that thing
+		if parentMatch.nil?
+			puts "No common ancestor found, pushing change to target"
+			createItem(directory, sourceItem)
+		# if there's no matching item, but there is a parent, well, i guess it got deleted 
+		# in the target, but is needed by source.  add it back in.
+		elsif matchingItem.nil?
+			puts "No matching item found, pushing change to target"
+			createItem(directory, sourceItem)
+		# if we've got everything we need, we'll attempt to merge
+		else
+			# if this is a tree, continue on to do all the logic for it
+			if sourceItem["type"] == "tree"
+				mergeFilesForDirectory(File.join(directory, sourceItem["name"]), sourceItem["hash"], matchingItem["hash"], parentMatch["hash"])
+			# if it's a fine, try to merge the two together
+			# man, this might fail horribly with binary files.
+			# watch out for that
+			elsif sourceItem["type"] == "blob"
+				if sourceItem["hash"] != matchingItem["hash"]
+					mergeFiles(sourceItem["hash"], matchingItem["hash"], parentMatch["hash"], File.join(directory, sourceItem["name"]))
+				end
+			end
+		end
+	end
+end
+
+# attempt to merge two files together given a common parent
+# this seems like a pretty naive way of doing things, but i'm lazy!
+def mergeFiles(sourceHash, targetHash, parentHash, targetPath)
+	sourceData = IO.readlines(File.join(getObjectsDirectory, sourceHash))
+	targetData = IO.readlines(File.join(getObjectsDirectory, targetHash))
+	parentData = IO.readlines(File.join(getObjectsDirectory, parentHash))
+	# get the changes it took to get from the parent to the source
+	# and then apply them to the target
+	diffs = Diff::LCS.diff(parentData, sourceData)
+	mergedData = Diff::LCS.patch!(targetData, diffs)
+	mergedFile = File.open(targetPath, "w")
+	mergedFile.truncate(0)
+	mergedData.each do |mergeLine|
+		mergedFile.write mergeLine
+	end
+	mergedFile.close
+end
+
+# attempt to create the item specified in the entry
+def createItem(directory, entry)
+	# each "tree" item specifies a directory that should be made corresponding to 
+	# that directory's json file (hash)
+	if entry["type"] == "tree"
+		d = directory + '/' + entry["name"]
+		Dir.mkdir(d)
+		dirJson = getDataFromJson(File.join(getObjectsDirectory, entry["hash"]))
+		moveFiles(d, dirJson)
+	# copy the item out of the objects folder into its proper place
+	elsif entry["type"] == "blob"
+		FileUtils.cp(File.join(getObjectsDirectory, entry["hash"]), File.join(directory, entry["name"]))
 	end
 end
 
@@ -130,7 +253,7 @@ end
 def saveDataToJson(filePath, data)
 	file = File.open(filePath, "w")
 	file.truncate(0)
-	file.puts JSON.generate data
+	file.puts(JSON.generate(data))
 	file.close
 end
 
@@ -225,17 +348,7 @@ end
 # gets files from the given json 
 def moveFiles(directoryName, jsonInfo)
 	jsonInfo.each do |item|
-		# each "tree" item specifies a directory that should be made corresponding to 
-		# that directory's json file (hash)
-		if item["type"] == "tree"
-			d = directoryName + '/' + item["name"]
-			Dir.mkdir(d)
-			dirJson = getDataFromJson(File.join(getObjectsDirectory, item["hash"]))
-			moveFiles(d, dirJson)
-		# copy the item out of the objects folder into its proper place
-		elsif item["type"] == "blob"
-			FileUtils.cp(File.join(getObjectsDirectory, item["hash"]), File.join(directoryName, item["name"]))
-		end
+		createItem(directoryName, item)
 	end
 end
 
