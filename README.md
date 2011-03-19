@@ -26,7 +26,7 @@ What You Need:
 
 What To Do:
 -----------
-Well, if you're still reading after all my warnings, I guess you want to try this out.  You're crazy.  It works much like git.
+Well, if you're still reading after all my warnings, I guess you want to try this out.  You're crazy.  
 
 First, put tvc.rb somewhere you'll remember.  Don't put it in the directory you're wanting the repository in, otherwise it will be in your repository, and you don't really need that.  Go to where you want your repository and type:
 	
@@ -71,5 +71,5 @@ Things That Might Happen Eventually:
 * Compression.  The stored files currently will take up a large amount of space, they'll need to be compressed.
 * Viewable diffs and statuses.
 * Figure out repository recursively (right now you have to be in the root of the repository to do anything)
-* Make this into some sort of distributable form (but let's be honest, Ruby is kind of crap for this)
+* Make this into some sort of distributable form so I can stop typing "ruby <path to tvc.rb> blah blah blah" (but let's be honest, Ruby is kind of crap for this)
 * Unit tests.  Probably should have started with those, but oh well.
