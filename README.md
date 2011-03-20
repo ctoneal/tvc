@@ -49,11 +49,19 @@ Now you're on that branch, ready to modify it.  Once you've committed changes to
 	% ruby <path to tvc.rb> checkout <branch you want to merge into>
 	% ruby <path to tvc.rb> merge <branch you want to merge from>
 	
-By now, you've noticed each commit has a corresponding SHA-2 hash.  If you want to roll back to a revision, type:
+By now, you've noticed each commit has a corresponding SHA-2 hash.  If you want to pull the files from a revision, type:
 	
 	% ruby <path to tvc.rb> replace <the hash of the commit you want>
 	
-You don't have to type the whole hash, you can type just a few characters off the front of it.  You run the risk of messing up, I suppose.  Be careful.  To get a list of all commits up the tree from where you currently are, type:
+You don't have to type the whole hash, you can type just a few characters off the front of it.  You run the risk of messing up, I suppose.  Be careful.  If you want to roll back your repository to how it was at a specific commit, type:
+	
+	% ruby <path to tvc.rb> rollback <the hash of the commit you want>
+	
+And if you want to just reset everything to how it was before you screwed everything up, you can go back to the last commit by typing:
+
+	% ruby <path to tvc.rb> reset
+
+To get a list of all commits up the tree from where you currently are, type:
 
 	% ruby <path to tvc.rb> history
 	
@@ -71,3 +79,4 @@ Things That Might Happen Eventually:
 * Viewable diffs and statuses.
 * Make this into some sort of distributable form so I can stop typing "ruby <path to tvc.rb> blah blah blah" (but let's be honest, Ruby is kind of crap for this)
 * Unit tests.  Probably should have started with those, but oh well.
+* The ability to work with external repositories (push, pull, users, blah blah blah)

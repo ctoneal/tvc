@@ -238,6 +238,8 @@ def help
 	puts "branch - Create a new branch.  If not given a branch name, it lists all current branches."
 	puts "checkout - Move to the specified branch for modifying"
 	puts "replace - Pulls the desired revision down from the repository"
+	puts "rollback - Replace the files with the desired revision and commit"
+	puts "reset - Go back to the state of the most recent commit"
 	puts "merge - Merges the specified branch with the current branch"
 end
 
@@ -483,6 +485,11 @@ when "commit"
 	commit ARGV[1]
 when "replace"
 	replace ARGV[1]
+when "rollback"
+	replace ARGV[1]
+	commit "Rolled back to #{ARGV[1]}"
+when "reset"
+	replace(getCurrentEntry["hash"])
 when "history"
 	history
 when "branch"
