@@ -4,6 +4,7 @@ require 'fileutils'
 require 'json'
 require 'tmpdir'
 require 'diff/lcs'
+require 'zlib'
 
 # print an error that states that the program must be run in the directory
 # with the repository, and that the repository needs to be initialized.
@@ -27,9 +28,7 @@ end
 
 # commit current changes
 def commit(message)
-	Dir.chdir(getObjectsDirectory)
 	hash = createObjects(@runDir)
-	Dir.chdir(@repoDir)
 	current = getCurrentEntry
 	data = {"message" => message, "hash" => hash, "parent" => current["hash"]}
 	addHistoryEntry(data)
@@ -43,7 +42,6 @@ end
 
 # replace current files with requested version
 def replace(versionHash)
-	Dir.chdir(getObjectsDirectory)
 	hash = getFullHash(versionHash)
 	if not hash.nil?
 		deleteFiles(@runDir)
@@ -73,7 +71,6 @@ end
 
 # create a branch
 def branch(name)
-	Dir.chdir(@repoDir)
 	b = findBranch(name)
 	if b.nil?
 		current = getCurrentEntry
@@ -86,7 +83,6 @@ end
 
 # checkout a branch
 def checkout(branchName)
-	Dir.chdir(@repoDir)
 	checkoutBranch = findBranch(branchName)
 	if not checkoutBranch.nil?
 		changeCurrentEntry(checkoutBranch)
@@ -201,15 +197,14 @@ end
 # attempt to merge two files together given a common parent
 # this seems like a pretty naive way of doing things, but i'm lazy!
 def mergeFiles(sourceHash, targetHash, parentHash, targetPath)
-	sourceData = IO.readlines(File.join(getObjectsDirectory, sourceHash))
-	targetData = IO.readlines(File.join(getObjectsDirectory, targetHash))
-	parentData = IO.readlines(File.join(getObjectsDirectory, parentHash))
+	sourceData = getFileData(File.join(getObjectsDirectory, sourceHash))
+	targetData = getFileData(File.join(getObjectsDirectory, targetHash))
+	parentData = getFileData(File.join(getObjectsDirectory, parentHash))
 	# get the changes it took to get from the parent to the source
 	# and then apply them to the target
 	diffs = Diff::LCS.diff(parentData, sourceData)
 	mergedData = Diff::LCS.patch!(targetData, diffs)
 	mergedFile = File.open(targetPath, "w")
-	mergedFile.truncate(0)
 	mergedData.each do |mergeLine|
 		mergedFile.write mergeLine
 	end
@@ -227,7 +222,10 @@ def createItem(directory, entry)
 		moveFiles(d, dirJson)
 	# copy the item out of the objects folder into its proper place
 	elsif entry["type"] == "blob"
-		FileUtils.cp(File.join(getObjectsDirectory, entry["hash"]), File.join(directory, entry["name"]))
+		f = File.open(File.join(directory, entry["name"]), "w")
+		f.write(getFileData(File.join(getObjectsDirectory, entry["hash"])))
+		f.close
+#		FileUtils.cp(File.join(getObjectsDirectory, entry["hash"]), File.join(directory, entry["name"]))
 	end
 end
 
@@ -244,17 +242,35 @@ end
 
 # extracts json data from a given file
 def getDataFromJson(filePath)
-	fileText = File.open(filePath, "rb") { |f| f.read }
-	fileJson = JSON.parse fileText
+	JSON.parse(getFileData(filePath))
+end
+
+# gets and decompresses a given file
+def getFileData(filePath)
+	decompress(File.open(filePath, "rb") { |f| f.read })	
+end
+
+# decompresses given data
+def decompress(data)
+	Zlib::Inflate.inflate(data)
+end
+
+# compresses and saves data to a path
+def saveFileData(filePath, data)
+	f = File.open(filePath, "wb")
+	f.write(compress(data))
+	f.close
+end
+
+# compresses given data
+def compress(data)
+	Zlib::Deflate.deflate(data)
 end
 
 # puts data in json format in a given file
 # warning:  this will replace all text in the file
 def saveDataToJson(filePath, data)
-	file = File.open(filePath, "w")
-	file.truncate(0)
-	file.puts(JSON.generate(data))
-	file.close
+	saveFileData(filePath, JSON.generate(data))
 end
 
 # changes the hash for a specified branch, and sets the parent to the previous hash
@@ -367,9 +383,13 @@ def createObjects(directoryName)
 			end
 		# create a hash based on the file contents
 		else
-			hash = createHash(dirpath)
+			fileData = File.open(dirpath, "rb") { |f| f.read }
+			tempFileName = File.join(@repoDir, "temp")
+			saveFileData(tempFileName, fileData)
+			hash = createHash(tempFileName)
 			data = { "type" => "blob", "name" => dir, "hash" => hash }
-			FileUtils.cp(dirpath, File.join(getObjectsDirectory, hash))
+			FileUtils.cp(tempFileName, File.join(getObjectsDirectory, hash))
+			File.delete(tempFileName)
 			objects << data
 		end
 	end

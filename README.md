@@ -68,7 +68,6 @@ or
 
 Things That Might Happen Eventually:
 -------------
-* Compression.  The stored files currently will take up a large amount of space, they'll need to be compressed.
 * Viewable diffs and statuses.
 * Figure out repository recursively (right now you have to be in the root of the repository to do anything)
 * Make this into some sort of distributable form so I can stop typing "ruby <path to tvc.rb> blah blah blah" (but let's be honest, Ruby is kind of crap for this)
