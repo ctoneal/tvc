@@ -18,6 +18,7 @@ end
 
 # initialize a repository
 def init
+	Dir.chdir(@runDir)
 	Dir.mkdir(".tvc") unless Dir::exists?(".tvc")
 	@repoDir = getRepositoryDirectory
 	Dir.mkdir(getObjectsDirectory) unless Dir::exists?(getObjectsDirectory)
@@ -429,11 +430,25 @@ end
 
 # get the repository directory
 def getRepositoryDirectory
-	if Dir::exists?(".tvc")
-		Dir.chdir(".tvc")
-		return Dir.getwd
+	while true
+		atRoot = true
+		Dir.foreach(Dir.getwd) do |dir|
+			if dir == ".tvc"
+				@runDir = Dir.getwd
+				Dir.chdir(".tvc")
+				return Dir.getwd
+			end
+			if dir == ".."
+				atRoot = false
+			end
+		end
+		if atRoot
+			Dir.chdir(@runDir)
+			return nil
+		else
+			Dir.chdir("..")
+		end
 	end
-	return nil
 end
 
 # list all existing branches
