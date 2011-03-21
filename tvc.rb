@@ -112,6 +112,107 @@ def merge(branchName)
 	end
 end
 
+# find and display the changes from the current version in the repository
+def status
+	current = getCurrentEntry
+	changes = findChanges(@runDir, current["hash"])
+	if changes.empty?
+		puts "No changes made"
+	else
+		changes.each do |change|
+			puts "#{change["name"]} #{change["type"]}"
+		end
+	end
+end
+
+# creates a list of changes made
+def findChanges(directory, currentHash)
+	currentData = getDataFromJson(File.join(getObjectsDirectory, currentHash))
+	changes = []
+	# loop through every item in the directory
+	Dir.foreach(directory) do |dirItem|
+		if dirItem != '.' && dirItem != '..' && dirItem != ".tvc"
+			dirPath = File.join(directory, dirItem)
+			foundItem = nil
+			itemType = File.directory?(dirPath) ? "tree" : "blob"
+			# compare the item to the directory's json
+			currentData.each_index do |index|
+				currentItem = currentData[index]
+				if currentItem["name"] == dirItem && currentItem["type"] == itemType
+					foundItem = currentItem
+					currentData.delete_at(index)
+					break
+				end
+			end
+			# if nothing in the json matched this item, it must be new
+			if foundItem.nil?
+				newChange = { "type" => "added", "name" => dirPath.gsub(@runDir, "") }
+				changes << newChange
+				if itemType == "tree"
+					newChanges = findChangesInNewDirectory(dirPath)
+					newChanges.each do |change|
+						changes << change
+					end
+				end
+			# we found a match, so we need to compare it
+			else
+				# if it's a directory, continue down to find changes in there
+				if itemType == "tree"
+					newChanges = findChanges(dirPath, foundItem["hash"])
+					newChanges.each do |newChange|
+						changes << newChange
+					end
+				# if it's a file, compare the contents
+				else
+					# this is a really hacky way to do this, but i'm so lazy
+					repoData = getFileData(File.join(getObjectsDirectory, foundItem["hash"]))
+					repoData = repoData.gsub(/\s/, "")
+					fileData = File.open(dirPath) { |f| f.read }
+					fileData = fileData.gsub(/\s/, "")
+					diffs = Diff::LCS.diff(repoData, fileData)
+					modified = false
+					diffs.each do |diffArray|
+						diffArray.each do |diff|
+							if diff.action != "=" && diff.element != ""
+								modified = true;
+							end
+						end
+					end
+					if modified
+						newChange = { "type" => "modified", "name" => dirPath.gsub(@runDir, "") }
+						changes << newChange
+					end
+				end
+			end
+		end
+	end
+	# if we still have items in the directory json, they must have been deleted
+	currentData.each do |currentItem|
+		newChange = { "type" => "deleted", "name" => currentItem["name"] }
+		changes << newChange
+	end
+	return changes
+end
+
+# returns a list of everything in this directory.
+def findChangesInNewDirectory(directory)
+	changes = []
+	Dir.foreach(directory) do |dirItem|
+		if dirItem != '.' && dirItem != '..' && dirItem != ".tvc"
+			dirPath = File.join(directory, dirItem)
+			newChange = { "type" => "added", "name" => dirPath.gsub(@runDir, "") }
+			changes << newChange
+			if File.directory?(dirPath)
+				newChanges = findChangesInNewDirectory(dirPath)
+				newChanges.each do |change|
+					changes << change
+				end
+			end
+		end
+	end
+	return changes
+end
+
 # attempts to find a common parent for the two revisions
 def findCommonAncestor(source, target)
 	sourceParentHash = source["hash"]
@@ -226,7 +327,6 @@ def createItem(directory, entry)
 		f = File.open(File.join(directory, entry["name"]), "w")
 		f.write(getFileData(File.join(getObjectsDirectory, entry["hash"])))
 		f.close
-#		FileUtils.cp(File.join(getObjectsDirectory, entry["hash"]), File.join(directory, entry["name"]))
 	end
 end
 
@@ -238,9 +338,8 @@ def help
 	puts "branch - Create a new branch.  If not given a branch name, it lists all current branches."
 	puts "checkout - Move to the specified branch for modifying"
 	puts "replace - Pulls the desired revision down from the repository"
-	puts "rollback - Replace the files with the desired revision and commit"
-	puts "reset - Go back to the state of the most recent commit"
 	puts "merge - Merges the specified branch with the current branch"
+	puts "status - Prints a list of changes from the current version of the repository"
 end
 
 # extracts json data from a given file
@@ -502,6 +601,8 @@ when "checkout"
 	checkout ARGV[1]
 when "merge"
 	merge ARGV[1]
+when "status"
+	status
 else
 	help
 end

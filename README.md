@@ -65,6 +65,10 @@ To get a list of all commits up the tree from where you currently are, type:
 
 	% ruby <path to tvc.rb> history
 	
+To see a list of what has changed since the last commit to the repository, type:
+
+	% ruby <path to tvc.rb> status
+	
 And, if you ever forget these few commands, they're accessible by typing:
 
 	% ruby <path to tvc.rb> 
@@ -76,7 +80,7 @@ or
 
 Things That Might Happen Eventually:
 -------------
-* Viewable diffs and statuses.
+* Better status information.
 * Make this into some sort of distributable form so I can stop typing "ruby <path to tvc.rb> blah blah blah" (but let's be honest, Ruby is kind of crap for this)
 * Unit tests.  Probably should have started with those, but oh well.
 * The ability to work with external repositories (push, pull, users, blah blah blah)
