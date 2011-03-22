@@ -19,7 +19,7 @@ Features (if you can call them that):
 
 What You Need:
 -------------
-* Ruby (I made it using 1.9.2, but I don't think there's anything really specific to 1.9 in there)
+* Ruby 1.9
 * json gem (gem install json)
 * diff-lcs gem (gem install diff-lcs)
 * The desire to use sub-par code

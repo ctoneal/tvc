@@ -6,6 +6,10 @@ require 'tmpdir'
 require 'diff/lcs'
 require 'zlib'
 
+class Diff::LCS::Change
+	attr_accessor :position
+end
+
 # print an error that states that the program must be run in the directory
 # with the repository, and that the repository needs to be initialized.
 #
@@ -303,13 +307,33 @@ def mergeFiles(sourceHash, targetHash, parentHash, targetPath)
 	targetData = getFileData(File.join(getObjectsDirectory, targetHash))
 	parentData = getFileData(File.join(getObjectsDirectory, parentHash))
 	# get the changes it took to get from the parent to the source
-	# and then apply them to the target
-	diffs = Diff::LCS.diff(parentData, sourceData)
-	mergedData = Diff::LCS.patch!(targetData, diffs)
-	mergedFile = File.open(targetPath, "w")
-	mergedData.each do |mergeLine|
-		mergedFile.write mergeLine
+	sourceDiffs = Diff::LCS.diff(parentData, sourceData)
+	targetDiffs = Diff::LCS.diff(parentData, targetData)
+	# need to modify the source diffs based on the changes between the parent
+	# and the target.
+	# (this is really hacky and inefficient.  i need to come up with a better 
+	# way to do this)
+	targetDiffs.each do |targetDiffArray|
+		targetDiffArray.each do |targetDiff|
+			sourceDiffs.each do |sourceDiffArray|
+				sourceDiffArray.each do |sourceDiff|
+					if targetDiff.position <= sourceDiff.position
+						if targetDiff.action == "-"
+							sourceDiff.position -= targetDiff.element.length
+						elsif targetDiff.action == "+"
+							sourceDiff.position += targetDiff.element.length
+						end
+					end
+				end
+			end
+		end
 	end
+	# once we have all the changes between the source and parent, and they've
+	# been adjusted by the changes between target and parent, apply the source
+	# changes to the target
+	mergedData = Diff::LCS.patch!(targetData, sourceDiffs)
+	mergedFile = File.open(targetPath, "w")
+	mergedFile.write mergedData
 	mergedFile.close
 end
 
