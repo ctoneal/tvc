@@ -20,67 +20,68 @@ Features (if you can call them that):
 What You Need:
 -------------
 * Ruby 1.9
-* json gem (gem install json)
-* diff-lcs gem (gem install diff-lcs)
 * The desire to use sub-par code
 
 What To Do:
 -----------
 Well, if you're still reading after all my warnings, I guess you want to try this out.  You're crazy.  
 
-First, put tvc.rb somewhere you'll remember.  Don't put it in the directory you're wanting the repository in, otherwise it will be in your repository, and you don't really need that.  Go to where you want your repository and type:
+First, install the TVC gem.
+
+	% gem install tvc
+
+Go to where you want your repository and type:
 	
-	% ruby <path to tvc.rb> init
+	% tvc init
 	
 This will initialize the repository.  After that, commit like so:
 
-	% ruby <path to tvc.rb> commit "some message about committing"
+	% tvc commit "some message about committing"
 	
 And of course, it's going to be the same anytime you want to commit changes to the repository.  To branch, type:
 
-	% ruby <path to tvc.rb> branch <some name for the branch>
+	% tvc branch <some name for the branch>
 	
 If no name is specified, it will list all current branches.  To move to a branch, type:
 
-	% ruby <path to tvc.rb> checkout <name of a branch>
+	% tvc checkout <name of a branch>
 	
 Now you're on that branch, ready to modify it.  Once you've committed changes to the branch and want to merge them in somewhere else (say, for instance, the master branch), type:
 
-	% ruby <path to tvc.rb> checkout <branch you want to merge into>
-	% ruby <path to tvc.rb> merge <branch you want to merge from>
+	% tvc checkout <branch you want to merge into>
+	% tvc merge <branch you want to merge from>
 	
 By now, you've noticed each commit has a corresponding SHA-2 hash.  If you want to pull the files from a revision, type:
 	
-	% ruby <path to tvc.rb> replace <the hash of the commit you want>
+	% tvc replace <the hash of the commit you want>
 	
 You don't have to type the whole hash, you can type just a few characters off the front of it.  You run the risk of messing up, I suppose.  Be careful.  If you want to roll back your repository to how it was at a specific commit, type:
 	
-	% ruby <path to tvc.rb> rollback <the hash of the commit you want>
+	% tvc rollback <the hash of the commit you want>
 	
 And if you want to just reset everything to how it was before you screwed everything up, you can go back to the last commit by typing:
 
-	% ruby <path to tvc.rb> reset
+	% tvc reset
 
 To get a list of all commits up the tree from where you currently are, type:
 
-	% ruby <path to tvc.rb> history
+	% tvc history
 	
 To see a list of what has changed since the last commit to the repository, type:
 
-	% ruby <path to tvc.rb> status
+	% tvc status
 	
 And, if you ever forget these few commands, they're accessible by typing:
 
-	% ruby <path to tvc.rb> 
+	% tvc 
 	
 or
 
-	% ruby <path to tvc.rb> help
+	% tvc help
 	
 
 Things That Might Happen Eventually:
 -------------
 * Better status information.
-* Make this into some sort of distributable form so I can stop typing "ruby <path to tvc.rb> blah blah blah" (but let's be honest, Ruby is kind of crap for this)
 * Unit tests.  Probably should have started with those, but oh well.
 * The ability to work with external repositories (push, pull, users, blah blah blah)
