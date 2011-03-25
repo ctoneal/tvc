@@ -1,29 +1,28 @@
-TVC - Terrible Version Control
-==============================
+= TVC - Terrible Version Control
 
-What TVC Is:
-------------
+== What TVC Is:
+
 TVC is a really terrible pseudo-remake of git in Ruby.  It should never really be used; its creation was a joke and a learning experience.  It will always be inferior to git.  I read a blog post called [The Git Parable](http://tom.preston-werner.com/2009/05/19/the-git-parable.html), and wrote it based on some of the explanations given there.  It's not a terribly well written piece of code, just a script I hacked together in the span of about a day.  I'm slowly adding to and revising it, but don't expect much.  If you're the version control police, please don't arrest me.  It was all meant as good fun, I swear!
 
 Also, this is the first real thing I've written in Ruby.  It's not going to be pretty, and I'm pretty sure I'm not doing things "the Ruby way" or whatever.  Be gentle.
 
 However, you might find it interesting to look at.  It works in limited situations: if you only want a local repository, and you don't need a whole lot of features or quality, well, it might do.  
 
-Features (if you can call them that):
----------
+== Features (if you can call them that):
+
 * Storing versions
 * Branching
 * Merging (but it's a pretty terrible merge right now, don't trust it!)
 * Viewing a list of commits for the branch you're on
 * Pulling a previous revision
 
-What You Need:
--------------
+== What You Need:
+
 * Ruby 1.9
 * The desire to use sub-par code
 
-What To Do:
------------
+== What To Do:
+
 Well, if you're still reading after all my warnings, I guess you want to try this out.  You're crazy.  
 
 First, install the TVC gem.
@@ -80,8 +79,8 @@ or
 	% tvc help
 	
 
-Things That Might Happen Eventually:
--------------
+== Things That Might Happen Eventually:
+
 * Better status information.
 * Unit tests.  Probably should have started with those, but oh well.
 * The ability to work with external repositories (push, pull, users, blah blah blah)
